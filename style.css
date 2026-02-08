@@ -6,9 +6,6 @@ body{
   color:#fff;
   display:flex;
   justify-content:center;
-
-  /* pomembno: omogoči scroll */
-  overflow-y:auto;
 }
 
 .app{
@@ -44,27 +41,23 @@ video{
   pointer-events:none;
 }
 
-/* POMEMBNO:
-   #stickers NE SME imeti touch-action:none, sicer ubije scroll strani.
-*/
 #stickers{
   position:absolute;
   inset:0;
+  /* ne blokira scrolla strani */
+  touch-action: manipulation;
 }
 
-/* touch-action:none damo samo nalepki, ko jo uporabnik “prime” */
 .sticker{
   position:absolute;
   left:50%;
   top:50%;
+  font-size:64px;
   transform: translate(-50%,-50%) rotate(0deg) scale(1);
   transform-origin:center center;
-  font-size:64px;
-  line-height:1;
   cursor:grab;
   user-select:none;
-
-  touch-action:none; /* pinch/drag deluje na nalepki */
+  line-height:1;
   filter: drop-shadow(0 10px 18px rgba(0,0,0,.35));
 }
 
