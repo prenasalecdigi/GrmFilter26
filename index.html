@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="sl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Foto filter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ODER 9:16 -->
+  <div class="stage" id="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <img src="zelen.png" class="overlay" alt="overlay">
+    <div id="stickers"></div>
+  </div>
+
+  <!-- GUMBI -->
+  <div class="controls">
+    <button id="shot">📸 Fotografiraj</button>
+    <button id="flip">🔄 Obrni kamero</button>
+
+    <div class="row">
+      <button id="deleteSelected" class="danger">🗑 Izbriši nalepko</button>
+      <button id="clearAll" class="danger">🧹 Počisti vse</button>
+    </div>
+
+    <div class="hint">
+      Tapni nalepko → izberi. 1 prst: premik. 2 prsta: pinch zoom + rotacija.
+    </div>
+
+    <div class="emojis">
+      <button>🚜</button><button>🌸</button><button>🐴</button><button>🐄</button>
+      <button>🧪</button><button>🔬</button><button>🧬</button>
+      <button>🍎</button><button>🥛</button><button>🧁</button>
+      <button>🎂</button><button>🥩</button><button>🎓</button>
+      <button>📚</button><button>🪴</button><button>🍅</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
