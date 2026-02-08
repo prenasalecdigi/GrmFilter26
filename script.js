@@ -51,22 +51,21 @@ stage.addEventListener("pointerdown", (e)=>{
   }
 });
 
-/* ---------------- NALepke + PINCH ---------------- */
+/* ---------------- NALepke + pinch ---------------- */
 document.querySelectorAll(".emojis button").forEach(btn=>{
   btn.onclick = ()=>{
     const el = document.createElement("div");
     el.className = "sticker";
     el.textContent = btn.textContent;
 
-    // podatki za transform
-    el.dataset.x = "50";     // %
-    el.dataset.y = "50";     // %
-    el.dataset.s = "1";      // scale
-    el.dataset.r = "0";      // rotation deg
+    el.dataset.x = "50";   // %
+    el.dataset.y = "50";   // %
+    el.dataset.s = "1";    // scale
+    el.dataset.r = "0";    // rotation
 
     applyTransform(el);
 
-    // izberi ob tapu
+    // select on tap
     el.addEventListener("pointerdown", (e)=>{
       e.stopPropagation();
       selectSticker(el);
@@ -97,7 +96,6 @@ function enableGestures(el){
 
   let dragOffset = null;
 
-  // pinch start
   let startDist = 0;
   let startAngle = 0;
   let startScale = 1;
@@ -109,13 +107,14 @@ function enableGestures(el){
   function mid(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
 
   el.addEventListener("pointerdown", (e)=>{
+    // POMEMBNO: preventDefault samo na nalepki (tukaj), ne na body/stage
     e.preventDefault();
+
     el.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
 
     const r = stage.getBoundingClientRect();
 
-    // 1 prst: “smooth” premik z offsetom
     if(pointers.size === 1){
       const ex = e.clientX - r.left;
       const ey = e.clientY - r.top;
@@ -127,7 +126,6 @@ function enableGestures(el){
       return;
     }
 
-    // 2 prsta: pinch init
     if(pointers.size === 2){
       const [p1,p2] = Array.from(pointers.values());
       startDist = dist(p1,p2);
@@ -166,22 +164,19 @@ function enableGestures(el){
       return;
     }
 
-    // 2 prsta pinch + rot + premik po midpointu
+    // 2 prsta pinch + rot + move
     if(pointers.size === 2){
       const [p1,p2] = Array.from(pointers.values());
       const d = dist(p1,p2);
       const a = ang(p1,p2);
       const m = mid(p1,p2);
 
-      // scale
       let ns = startScale * (d / startDist);
       ns = clamp(ns, 0.4, 3.0);
 
-      // rotation
       const delta = a - startAngle;
       const nr = startRot + (delta * 180 / Math.PI);
 
-      // premik (midpoint)
       if(startMid){
         const dx = m.x - startMid.x;
         const dy = m.y - startMid.y;
@@ -201,7 +196,6 @@ function enableGestures(el){
         el.dataset.x = String(x);
         el.dataset.y = String(y);
 
-        // posodobi midpoint za gladko sledenje
         startMid = m;
       }
 
@@ -233,38 +227,33 @@ document.getElementById("shot").onclick = async ()=>{
   canvas.width=W; canvas.height=H;
   const ctx = canvas.getContext("2d");
 
-  // video crop (cover)
   const vw=video.videoWidth, vh=video.videoHeight;
   const tr=W/H, vr=vw/vh;
-
   let sx=0,sy=0,sw=vw,sh=vh;
   if(vr>tr){ sw=vh*tr; sx=(vw-sw)/2; }
   else{ sh=vw/tr; sy=(vh-sh)/2; }
 
-  // draw video
   if(facing==="user"){
     ctx.translate(W,0); ctx.scale(-1,1);
   }
   ctx.drawImage(video,sx,sy,sw,sh,0,0,W,H);
   ctx.setTransform(1,0,0,1,0,0);
 
-  // overlay contain
   const overlay = document.querySelector(".overlay");
   const ow=overlay.naturalWidth, oh=overlay.naturalHeight;
   const sc=Math.min(W/ow,H/oh);
   ctx.drawImage(overlay,(W-ow*sc)/2,(H-oh*sc)/2,ow*sc,oh*sc);
 
-  // nalepke (upoštevaj x,y,scale,rot)
   document.querySelectorAll(".sticker").forEach(el=>{
     const xPct = Number(el.dataset.x);
     const yPct = Number(el.dataset.y);
     const s = Number(el.dataset.s);
     const r = Number(el.dataset.r);
 
-    const x = (xPct/100) * W;
-    const y = (yPct/100) * H;
+    const x = (xPct/100)*W;
+    const y = (yPct/100)*H;
 
-    const base = 80;            // osnovna velikost
+    const base = 80;
     const fontPx = base * s;
 
     ctx.save();
@@ -275,13 +264,10 @@ document.getElementById("shot").onclick = async ()=>{
     ctx.textAlign="center";
     ctx.textBaseline="middle";
     ctx.fillText(el.textContent,0,0);
-
     ctx.restore();
   });
 
   const url = canvas.toDataURL("image/png");
-
-  // download / iOS odpre v novem zavihku (Save Image)
   const a=document.createElement("a");
   a.href=url;
   a.download="fotofilter.png";
