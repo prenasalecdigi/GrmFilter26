@@ -4,7 +4,6 @@ const stickersDiv = document.getElementById("stickers");
 
 let stream = null;
 let facing = "user";
-let selectedSticker = null;
 
 /* ---------------- KAMERA ---------------- */
 async function startCamera(){
@@ -26,6 +25,8 @@ document.getElementById("flip").onclick = ()=>{
 startCamera();
 
 /* ---------------- IZBIRA / BRISANJE ---------------- */
+let selectedSticker = null;
+
 function selectSticker(el){
   document.querySelectorAll(".sticker").forEach(s => s.classList.remove("selected"));
   selectedSticker = el;
@@ -45,33 +46,34 @@ document.getElementById("clearAll").onclick = ()=>{
 };
 
 // tap na prazno -> odznači
-stage.addEventListener("pointerdown", (e)=>{
+stage.addEventListener("click", (e)=>{
   if(!e.target.classList.contains("sticker")){
     selectSticker(null);
   }
 });
 
-/* ---------------- NALepke + pinch ---------------- */
+/* ---------------- NALepke + PINCH (TOUCH) ---------------- */
 document.querySelectorAll(".emojis button").forEach(btn=>{
   btn.onclick = ()=>{
     const el = document.createElement("div");
     el.className = "sticker";
     el.textContent = btn.textContent;
 
-    el.dataset.x = "50";   // %
-    el.dataset.y = "50";   // %
-    el.dataset.s = "1";    // scale
-    el.dataset.r = "0";    // rotation
+    // stanje (v % + transform)
+    el.dataset.x = "50";
+    el.dataset.y = "50";
+    el.dataset.s = "1";
+    el.dataset.r = "0";
 
     applyTransform(el);
 
     // select on tap
-    el.addEventListener("pointerdown", (e)=>{
+    el.addEventListener("click", (e)=>{
       e.stopPropagation();
       selectSticker(el);
     });
 
-    enableGestures(el);
+    enableTouchGestures(el);
 
     stickersDiv.appendChild(el);
     selectSticker(el);
@@ -91,33 +93,43 @@ function applyTransform(el){
 
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
-function enableGestures(el){
-  const pointers = new Map(); // pointerId -> {x,y}
-
+function enableTouchGestures(el){
+  let dragging = false;
   let dragOffset = null;
 
+  // pinch start
   let startDist = 0;
   let startAngle = 0;
   let startScale = 1;
   let startRot = 0;
-  let startMid = null;
+  let lastMid = null;
+
+  function rect(){ return stage.getBoundingClientRect(); }
 
   function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
-  function ang(a,b){ return Math.atan2(b.y-a.y, b.x-a.x); }
+  function angle(a,b){ return Math.atan2(b.y-a.y, b.x-a.x); }
   function mid(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
 
-  el.addEventListener("pointerdown", (e)=>{
-    // POMEMBNO: preventDefault samo na nalepki (tukaj), ne na body/stage
-    e.preventDefault();
+  function pts(touches){
+    return Array.from(touches).map(t => ({ x:t.clientX, y:t.clientY }));
+  }
 
-    el.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  el.addEventListener("touchstart", (ev)=>{
+    // pomembno: samo ko se dotikaš nalepke
+    ev.stopPropagation();
+    selectSticker(el);
 
-    const r = stage.getBoundingClientRect();
+    const r = rect();
+    const t = ev.touches;
 
-    if(pointers.size === 1){
-      const ex = e.clientX - r.left;
-      const ey = e.clientY - r.top;
+    if(t.length === 1){
+      // 1 prst: začni drag (tu preventDefault, ker premikamo nalepko)
+      ev.preventDefault();
+      dragging = true;
+
+      const p = t[0];
+      const ex = p.clientX - r.left;
+      const ey = p.clientY - r.top;
 
       const curX = (Number(el.dataset.x)/100) * r.width;
       const curY = (Number(el.dataset.y)/100) * r.height;
@@ -126,28 +138,33 @@ function enableGestures(el){
       return;
     }
 
-    if(pointers.size === 2){
-      const [p1,p2] = Array.from(pointers.values());
+    if(t.length === 2){
+      // 2 prsta: pinch (preventDefault da ne zooma stran)
+      ev.preventDefault();
+      dragging = false;
+      dragOffset = null;
+
+      const [p1,p2] = pts(t);
       startDist = dist(p1,p2);
-      startAngle = ang(p1,p2);
+      startAngle = angle(p1,p2);
       startScale = Number(el.dataset.s);
       startRot = Number(el.dataset.r);
-      startMid = mid(p1,p2);
-      dragOffset = null;
+      lastMid = mid(p1,p2);
     }
   }, { passive:false });
 
-  el.addEventListener("pointermove", (e)=>{
-    if(!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
-
-    const r = stage.getBoundingClientRect();
+  el.addEventListener("touchmove", (ev)=>{
+    ev.stopPropagation();
+    const r = rect();
+    const t = ev.touches;
 
     // 1 prst drag
-    if(pointers.size === 1 && dragOffset){
-      const p = Array.from(pointers.values())[0];
-      const ex = p.x - r.left;
-      const ey = p.y - r.top;
+    if(t.length === 1 && dragging && dragOffset){
+      ev.preventDefault();
+      const p = t[0];
+
+      const ex = p.clientX - r.left;
+      const ey = p.clientY - r.top;
 
       let px = ex - dragOffset.dx;
       let py = ey - dragOffset.dy;
@@ -164,22 +181,27 @@ function enableGestures(el){
       return;
     }
 
-    // 2 prsta pinch + rot + move
-    if(pointers.size === 2){
-      const [p1,p2] = Array.from(pointers.values());
+    // 2 prsta pinch + rotate + move
+    if(t.length === 2){
+      ev.preventDefault();
+
+      const [p1,p2] = pts(t);
       const d = dist(p1,p2);
-      const a = ang(p1,p2);
+      const a = angle(p1,p2);
       const m = mid(p1,p2);
 
+      // scale
       let ns = startScale * (d / startDist);
       ns = clamp(ns, 0.4, 3.0);
 
+      // rotation
       const delta = a - startAngle;
       const nr = startRot + (delta * 180 / Math.PI);
 
-      if(startMid){
-        const dx = m.x - startMid.x;
-        const dy = m.y - startMid.y;
+      // premik z midpointom
+      if(lastMid){
+        const dx = m.x - lastMid.x;
+        const dy = m.y - lastMid.y;
 
         const curXpx = (Number(el.dataset.x)/100) * r.width;
         const curYpx = (Number(el.dataset.y)/100) * r.height;
@@ -195,28 +217,20 @@ function enableGestures(el){
 
         el.dataset.x = String(x);
         el.dataset.y = String(y);
-
-        startMid = m;
+        lastMid = m;
       }
 
       el.dataset.s = String(ns);
       el.dataset.r = String(nr);
       applyTransform(el);
     }
-  });
+  }, { passive:false });
 
-  el.addEventListener("pointerup", (e)=>{
-    pointers.delete(e.pointerId);
-    if(pointers.size < 2){
-      startMid = null;
-      dragOffset = null;
-    }
-  });
-
-  el.addEventListener("pointercancel", (e)=>{
-    pointers.delete(e.pointerId);
-    startMid = null;
+  el.addEventListener("touchend", (ev)=>{
+    // reset
+    dragging = false;
     dragOffset = null;
+    if(ev.touches.length < 2) lastMid = null;
   });
 }
 
@@ -227,6 +241,7 @@ document.getElementById("shot").onclick = async ()=>{
   canvas.width=W; canvas.height=H;
   const ctx = canvas.getContext("2d");
 
+  /* video crop */
   const vw=video.videoWidth, vh=video.videoHeight;
   const tr=W/H, vr=vw/vh;
   let sx=0,sy=0,sw=vw,sh=vh;
@@ -239,19 +254,21 @@ document.getElementById("shot").onclick = async ()=>{
   ctx.drawImage(video,sx,sy,sw,sh,0,0,W,H);
   ctx.setTransform(1,0,0,1,0,0);
 
+  /* overlay */
   const overlay = document.querySelector(".overlay");
   const ow=overlay.naturalWidth, oh=overlay.naturalHeight;
   const sc=Math.min(W/ow,H/oh);
   ctx.drawImage(overlay,(W-ow*sc)/2,(H-oh*sc)/2,ow*sc,oh*sc);
 
+  /* nalepke (upoštevaj scale+rot) */
   document.querySelectorAll(".sticker").forEach(el=>{
     const xPct = Number(el.dataset.x);
     const yPct = Number(el.dataset.y);
     const s = Number(el.dataset.s);
     const r = Number(el.dataset.r);
 
-    const x = (xPct/100)*W;
-    const y = (yPct/100)*H;
+    const x = (xPct/100) * W;
+    const y = (yPct/100) * H;
 
     const base = 80;
     const fontPx = base * s;
@@ -268,6 +285,8 @@ document.getElementById("shot").onclick = async ()=>{
   });
 
   const url = canvas.toDataURL("image/png");
+
+  /* ⬇️ SAMODEJNI PRENOS / iOS fallback */
   const a=document.createElement("a");
   a.href=url;
   a.download="fotofilter.png";
